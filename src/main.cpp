@@ -10,6 +10,7 @@
  */
 
 #include <cstdlib>
+#include <cmath>
 #include <iterator>
 #include <string>
 #include <vector>
@@ -22,6 +23,7 @@
 #include <yarp/os/LogStream.h>
 #include <yarp/sig/Vector.h>
 #include <yarp/sig/Matrix.h>
+#include <yarp/math/Math.h>
 
 #include <iCub/iKin/iKinFwd.h>
 
@@ -31,9 +33,9 @@ auto readFile(const std::string& filename, const unsigned int nDof,
               std::vector<yarp::sig::Vector>& joints) {
     std::ifstream fin(filename);
     if (fin.is_open()) {
-        double read;
         while (!fin.eof()) {
             yarp::sig::Vector q;
+            double read;
             for (unsigned int i = 0; i < nDof; i++) {
                 fin >> read;
                 q.push_back(read);
@@ -56,6 +58,19 @@ auto readFile(const std::string& filename, const unsigned int nDof,
 int main(int argc, char* argv[]) {
     yarp::os::ResourceFinder rf;
     rf.configure(argc, argv);
+
+    if (rf.check("help")) {
+        std::cout << "Available options:\n"
+                  << "--arm-type [left|right]_arm_v[x].[y]: specify the kinematic type of the arm\n"
+                  << "--use-torso [on|off]: specify whether to use the torso; default on\n"
+                  << "--swap-torso-joints [on|off]: swap the first and the third torso joints as read from the file; default on\n"
+                  << "--joints-constraints [on|off]: specify to apply the internal joints bounds: default off\n"
+                  << "--input-file filename: specify the file containing the joints values in degrees; default joints.txt\n"
+                  << "--print-joints: print out the joints values read from the input file\n"
+                  << "--help: this help\n"
+                  << std::endl;
+        return EXIT_SUCCESS;
+    }
 
     const auto arm_type = rf.check("arm-type", yarp::os::Value("left_arm_v1")).asString();
     iCub::iKin::iCubArm arm(arm_type);
@@ -82,7 +97,7 @@ int main(int argc, char* argv[]) {
     const auto input_filename = rf.check("input-file", yarp::os::Value("joints.txt")).asString();
     yInfo() << "Joints filename is" << input_filename;
     std::vector<yarp::sig::Vector> joints;
-    if (!readFile(input_filename, arm.getDOF(), swap_torso_joints, joints)) {
+    if (!readFile(input_filename, nDof, swap_torso_joints, joints)) {
         return EXIT_FAILURE;
     }
 
@@ -92,9 +107,9 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    yInfo() << "Arm end-effector pose";
+    yInfo() << "Arm end-effector pose in x y z ax ay az theta:";
     for (const auto& q:joints) {
-        std::cout << arm.EndEffPose(q).toString(3, 3) << std::endl;
+        std::cout << arm.EndEffPose((M_PI/180.)*q).toString(3, 3) << std::endl;
     }
 
     return EXIT_SUCCESS;
